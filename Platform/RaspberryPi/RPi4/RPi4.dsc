@@ -673,6 +673,17 @@
   MdeModulePkg/Universal/EbcDxe/EbcDxe.inf
 
   #
+  # UEFI Sandbox
+  #
+
+  UefiSandbox/UefiSandbox.inf {
+    <LibraryClasses>
+      DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLib.inf
+      JsonLib|RedfishPkg/Library/JsonLib/JsonLib.inf
+      Ucs2Utf8Lib|RedfishPkg/Library/BaseUcs2Utf8Lib/BaseUcs2Utf8Lib.inf
+      RedfishCrtLib|RedfishPkg/PrivateLibrary/RedfishCrtLib/RedfishCrtLib.inf
+  }
+  #
   # FAT filesystem + GPT/MBR partitioning
   #
   MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf

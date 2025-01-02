@@ -224,6 +224,11 @@ READ_LOCK_STATUS   = TRUE
   INF MdeModulePkg/Universal/EbcDxe/EbcDxe.inf
 
   #
+  # UEFI Sandbox
+  #
+  INF UefiSandbox/UefiSandbox.inf
+
+  #
   # FAT filesystem + GPT/MBR partitioning
   #
   INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
