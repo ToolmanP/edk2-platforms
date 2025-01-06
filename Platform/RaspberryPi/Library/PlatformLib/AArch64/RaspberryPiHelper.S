@@ -49,7 +49,105 @@
     dmb     ld
     .endm
 
+#define CURRENTEL_EL1           (0b01 << 2)
+#define CURRENTEL_EL2           (0b10 << 2)
+
+#define CPACR_EL1_FPEN          (0b11 << 20)
+#define ID_AA64PFR0_EL1_GIC     (0b1111 << 24)
+
+#define CNTHCTL_EL2_EL1PCEN     (1 << 1)
+#define CNTHCTL_EL2_EL1PCTEN    (1 << 0)
+#define CPTR_EL2_RES1           0x33ff
+#define HCR_EL2_RW              (1 << 31)
+#define ICC_SRE_EL2_SRE         (1 << 0)
+#define ICC_SRE_EL2_ENABLE      (1 << 3)
+
+#define SCR_EL3_HCE             (1 << 8)
+#define SCR_EL3_NS              (1 << 0)
+#define SCR_EL3_RW              (1 << 10)
+
+#define SPSR_ELX_DAIF           (0b1111 << 6)
+#define SPSR_ELX_EL1H           (0b0101)
+
+#define ICH_HCR_EL2             S3_4_C12_C11_0
+#define ICC_SRE_EL2             S3_4_C12_C9_5
+
+ASM_FUNC (ARM_ELX_TO_EL1)
+	mrs x9, CurrentEL
+
+	// Check the current exception level.
+	cmp x9, CURRENTEL_EL1
+	beq .Ltarget
+	cmp x9, CURRENTEL_EL2
+	beq .Lin_el2
+	// Otherwise, we are in EL3.
+
+	// Set EL2 to 64bit and enable the HVC instruction.
+	mrs x9, scr_el3
+	mov x10, SCR_EL3_NS | SCR_EL3_HCE | SCR_EL3_RW
+	orr x9, x9, x10
+	msr scr_el3, x9
+
+	// Set the return address and exception level.
+	adr x9, .Ltarget
+	msr elr_el3, x9
+	mov x9, SPSR_ELX_DAIF | SPSR_ELX_EL1H
+	msr spsr_el3, x9
+
+.Lin_el2:
+	// Disable EL1 timer traps and the timer offset.
+	mrs x9, cnthctl_el2
+	orr x9, x9, CNTHCTL_EL2_EL1PCEN | CNTHCTL_EL2_EL1PCTEN
+	msr cnthctl_el2, x9
+	msr cntvoff_el2, xzr
+
+	// Disable stage 2 translations.
+	msr vttbr_el2, xzr
+
+	// Disable EL2 coprocessor traps.
+	mov x9, CPTR_EL2_RES1
+	msr cptr_el2, x9
+
+	// Disable EL1 FPU traps.
+	mov x9, CPACR_EL1_FPEN
+	msr cpacr_el1, x9
+
+	// Check whether the GIC system registers are supported.
+	mrs x9, id_aa64pfr0_el1
+	and x9, x9, ID_AA64PFR0_EL1_GIC
+	cbz x9, .Lno_gic_sr
+
+	// Enable the GIC system registers in EL2, and allow their use in EL1.
+	mrs x9, ICC_SRE_EL2
+	mov x10, ICC_SRE_EL2_ENABLE | ICC_SRE_EL2_SRE
+	orr x9, x9, x10
+	msr ICC_SRE_EL2, x9
+
+	// Disable the GIC virtual CPU interface.
+	msr ICH_HCR_EL2, xzr
+
+.Lno_gic_sr:
+	// Set EL1 to 64bit.
+	mov x9, HCR_EL2_RW
+	msr hcr_el2, x9
+
+	// Set the return address and exception level.
+	adr x9, .Ltarget
+	msr elr_el2, x9
+	mov x9, SPSR_ELX_DAIF | SPSR_ELX_EL1H
+	msr spsr_el2, x9
+
+	isb
+	eret
+
+.Ltarget:
+	ret
+
 ASM_FUNC (ArmPlatformPeiBootAction)
+
+    mov     x1, lr
+    bl      ASM_PFX(ARM_ELX_TO_EL1)
+    mov     lr, x1
     mov     x1, #FixedPcdGet64 (PcdDmaDeviceOffset)
     orr     x0, x0, #RPI_MBOX_VC_CHANNEL
     // x1 holds the value of PcdDmaDeviceOffset throughout this function
